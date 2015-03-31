@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="favicon.ico">
+
+    <title>Index</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+</head>
+
+<body>
+    <div class="container">
+        <h1>Chat demo</h1>
+        <div id="connections">
+            <h1>Connecting to the chat...</h1>
+        </div>
+        <div id="name" style="display:none;">
+            <div class="row">
+                <div class="col-md-6 col-md-offset-3">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">
+                            <h3 class="panel-title">Enter your name</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="alert alert-danger" role="alert" style="display:none;" id="alert">Incorrect login or password</div>
+                            <form>
+                                <div class="form-group">
+                                    <input type="text" class="form-control" placeholder="Name" id="user_name">
+                                </div>
+                                <div class="form-group">
+                                    <input type="text" class="form-control" placeholder="Password the same as name" id="user_password">
+                                </div>
+                                <div class="form-group">
+                                    <button class="btn btn-primary btn-block" type="button" id="join">Sign in</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="chat" style="display:none;">
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">
+                            <h3 class="panel-title">Messages</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div style="height:500px; overflow-y: scroll; margin-bottom:15px;" class="messages">
+                            </div>
+                            <form>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" placeholder="Message" id="message">
+                                    <span class="input-group-btn">
+                                  <button class="btn btn-default" type="button" id="message_send">Send</button>
+                                </span>
+                                </div>
+                                <!-- /input-group -->
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">
+                            <h3 class="panel-title">Online users</h3>
+                        </div>
+                        <div class="panel-body" id="users_list">
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Bootstrap core JavaScript -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+    <script src="bootstrap/dist/js/bootstrap.min.js"></script>
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <script src="js/ie10-viewport-bug-workaround.js"></script>
+
+    <script type="text/javascript" src="../node_modules/amoeba.io/build/amoeba.io.min.js"></script>
+    <script type="text/javascript" src="../node_modules/amoeba.io-socket-client/build/amoeba.io-socket-client.js"></script>
+    <script type="text/javascript" src="../node_modules/socket.io-client/socket.io.js"></script>
+    <script type="text/javascript">
+    var amoeba = new Amoeba();
+
+    function sendMessage() {
+        amoeba.use("chat").invoke('addMessage', {
+            'author': name,
+            'message': $('#message').val()
+        }, function(err, data) {
+            console.log(arguments);
+        });
+        $('#message').val('');
+
+    }
+
+    function addMessage(message) {
+        $('.messages').append($('<div>' + message.author + "> " + message.message + '</div>'));
+        $(".messages").animate({
+            scrollTop: $('.messages')[0].scrollHeight
+        }, 1000);
+    }
+
+    function addUser(data) {
+        var exists = false;
+        $('.user').each(function() {
+            if ($(this).html() == data) {
+                exists = true;
+                return;
+            }
+        });
+        if (!exists) {
+            var el = $("<div class='user'>" + data + "</div>").hide();
+            $("#users_list").append(el);
+            el.show("slow");
+
+        }
+    }
+
+    function removeUser(name) {
+        $('.user').each(function() {
+            if ($(this).html() == name) {
+                $(this).remove();
+                return;
+            }
+        });
+    }
+
+    $('#message').keypress(function(event) {
+        if (event.keyCode == 13) {
+            sendMessage();
+            return false;
+        }
+    });
+    $('#message_send').click(function() {
+        sendMessage();
+    });
+
+    var name = "guest";
+    var sessionkey = null;
+    $('#join').click(function() {
+        name = $('#user_name').val();
+        amoeba.use("chat").invoke('auth', [$('#user_name').val(), $('#user_password').val(), sessionkey],
+            function(err, data) {
+                if(err===null){
+                    $('#alert').hide();
+                    $('#connections').hide();
+                    $('#name').hide();
+                    amoeba.use("chat").invoke('getMessages', {}, function(err, data) {
+                        for (var i = 0; i < data.messages.length; i++) {
+                            addMessage(data.messages[i]);
+                        }
+                        amoeba.use("chat").invoke('getUsers', {}, function(err, data) {
+                            for (var i = 0; i < data.users.length; i++) {
+                                addUser(data.users[i]);
+                            }
+                            $('#chat').show();
+                        });
+                    });
+                }else{
+                    console.log(arguments);
+                    $('#alert').show();
+                }
+            });
+    });
+
+    var socket = io('http://localhost:8090');
+    socket.on('connect', function() {
+        sessionkey = socket.id;
+        $('#connections').hide();
+        $('#name').show();
+        amoeba.use("chat", new SocketClient(socket));
+        amoeba.use("chat").on("new_message", function(data) {
+            addMessage(data);
+        });
+        amoeba.use("chat").on("user_join", function(data) {
+            addUser(data);
+        });
+        amoeba.use("chat").on("user_leave", function(data) {
+            removeUser(data);
+        });
+
+    });
+    </script>
+</body>
+
+</html>
